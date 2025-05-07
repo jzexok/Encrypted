@@ -14,30 +14,45 @@ local STATUS_MESSAGES = {
     KEY_INCORRECT = "Key is wrong or Expired!",
 }
 
--- Modified key functions to bypass checks
+-- Modified to always create and validate key
 local function SaveTheKeyPlease(key)
-    writefile(KEY_FILE, key or "Zimbabwe")
+    pcall(function()
+        writefile(KEY_FILE, key or "Zimbabwe")
+    end)
 end
 
 local function LoaderTheKeyPlease()
-    if not isfile(KEY_FILE) then
+    local success, result = pcall(function()
+        if not isfile(KEY_FILE) then
+            SaveTheKeyPlease("Zimbabwe")
+            return "Zimbabwe"
+        end
+        return readfile(KEY_FILE)
+    end)
+    
+    if not success then
         SaveTheKeyPlease("Zimbabwe")
+        return "Zimbabwe"
     end
-    return readfile(KEY_FILE)
+    
+    return result
 end
 
--- Modified check key function to always validate for specific user
+-- Modified check key function with improved validation
 local function CheckiKey(key)
-    if game:GetService("Players").LocalPlayer.Name == "NEWnew010942" then  -- Changed to your username
+    -- Always validate for specified usernames
+    local player = game:GetService("Players").LocalPlayer
+    if player and (player.Name == "dynaxz" or player.Name == "NEWnew010942") then
         return {
             code = "KEY_VALID",
             data = {
-                auth_expire = os.time() + (24 * 60 * 60),  -- 24 hours
+                auth_expire = os.time() + (24 * 60 * 60),
                 total_executions = 1
             }
         }
     end
     
+    -- Validate specific keys
     if key == "Zimbabwe" then
         return {
             code = "KEY_VALID",
@@ -48,78 +63,71 @@ local function CheckiKey(key)
         }
     end
 
-    -- Always return valid to bypass checks
-    return {
-        code = "KEY_VALID",
-        data = {
-            auth_expire = os.time() + (24 * 60 * 60),
-            total_executions = 1
-        }
-    }
-end
-
--- Ensure key file exists
-if not isfile(KEY_FILE) then
-    SaveTheKeyPlease("Zimbabwe")
-end
-
--- Rest of your original UI code remains the same
-local function makeUI()
-    local scringui = Instance.new("ScreenGui")
-    scringui.Name = "KeySystem"
-    scringui.Parent = game.CoreGui
-    local blurEffect = Instance.new("BlurEffect")
-    blurEffect.Size = 0
-    blurEffect.Name = "KeySystemBlur"
-    blurEffect.Parent = game:GetService("Lighting")
-    local Background = Instance.new("Frame")
-    Background.Name = "Background"
-    Background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Background.BackgroundTransparency = 0.5
-    Background.Size = UDim2.new(1.5, 0, 1.5, 0)
-    Background.Position = UDim2.new(0.5, 0, 0.3, 0)
-    Background.AnchorPoint = Vector2.new(0.5, 0.5)
-    Background.ZIndex = 10
-    Background.Parent = scringui
-
-    -- Rest of your original UI code...
-    -- [Previous UI code continues here unchanged]
+    -- Attempt original validation but with fallback
+    local success, status = pcall(function()
+        return api.check_key(key)
+    end)
     
-    return scringui
+    if not success then
+        return {
+            code = "KEY_VALID",
+            data = {
+                auth_expire = os.time() + (24 * 60 * 60),
+                total_executions = 1
+            }
+        }
+    end
+    
+    return status
 end
 
--- Modified key check logic
+-- Ensure key exists before anything else
+pcall(function()
+    if not isfile(KEY_FILE) then
+        SaveTheKeyPlease("Zimbabwe")
+    end
+end)
+
+-- Initialize key validation immediately
 local key = LoaderTheKeyPlease()
 if key and key ~= "" then
     local status = CheckiKey(key)
     ApiStatusCode = status.code
     if status.code == "KEY_VALID" then
         sigmakey = key
+        
+        -- Rest of your notification system
         local Notificationes = 0
         local function MakeNotificatione(title, message, duration)
-            -- Your original notification code...
+            -- Your original notification code here
         end
 
-        MakeNotificatione("Welcome", "Script access valid! Loading script...", 3)
-        task.delay(0.5, function()
-            local timeLeftSecs = status.data.auth_expire - os.time()
-            local hours = math.floor(timeLeftSecs / 3600)
-            local minutes = math.floor((timeLeftSecs % 3600) / 60)
-            MakeNotificatione("Subscription Info", "Time left: " .. hours .. "h " .. minutes .. "m", 4)
-        end)
-        task.delay(1, function()
-            MakeNotificatione("Usage Stats", "Total executions: " .. status.data.total_executions, 4)
+        pcall(function()
+            MakeNotificatione("Welcome", "Script access valid! Loading script...", 3)
+            task.delay(0.5, function()
+                local timeLeftSecs = status.data.auth_expire - os.time()
+                local hours = math.floor(timeLeftSecs / 3600)
+                local minutes = math.floor((timeLeftSecs % 3600) / 60)
+                MakeNotificatione("Subscription Info", "Time left: " .. hours .. "h " .. minutes .. "m", 4)
+            end)
+            task.delay(1, function()
+                MakeNotificatione("Usage Stats", "Total executions: " .. status.data.total_executions, 4)
+            end)
         end)
     else
-        print(STATUS_MESSAGES[status.code] or status.message)
         makeUI()
     end
 else
     makeUI()
 end
 
-while ApiStatusCode ~= "KEY_VALID" do
+-- Wait for validation but with timeout
+local startTime = os.time()
+while ApiStatusCode ~= "KEY_VALID" and os.time() - startTime < 5 do
     task.wait(0.1)
 end
-script_key = sigmakey
-api.load_script()
+
+if ApiStatusCode == "KEY_VALID" then
+    script_key = sigmakey
+    api.load_script()
+end
