@@ -2,132 +2,149 @@ if string.split(identifyexecutor() or "None", " ")[1] == "Xeno" then
     getgenv().WebSocket = nil
 end
 
-local api = loadstring(game:HttpGet("https://sdkapi-public.luarmor.net/library.lua"))()
+-- Initialize API with proper error handling
+local api
+local apiSuccess, apiError = pcall(function()
+    return loadstring(game:HttpGet("https://sdkapi-public.luarmor.net/library.lua"))()
+end)
+
+if not apiSuccess then
+    return error("Failed to load API: " .. tostring(apiError))
+end
+
+api = apiError -- In pcall, the second return value contains the result if successful
 api.script_id = "d0632c30c8af0316aae11552dcb2a21d"
+
 local sigmakey
 local KeyCheckingButtonSex
 local ApiStatusCode
 local KEY_FILE = "fartkey.txt"
-local STATUS_MESSAGES = {
-    KEY_VALID = "Key valid! Loading script...",
-    KEY_HWID_LOCKED = "HWID Mismatch. Please get a new Key!.",
-    KEY_INCORRECT = "Key is wrong or Expired!",
-}
 
--- Modified to always create and validate key
-local function SaveTheKeyPlease(key)
-    pcall(function()
-        writefile(KEY_FILE, key or "Zimbabwe")
-    end)
+-- Initialize API key immediately
+local function InitializeKey()
+    if not isfile(KEY_FILE) then
+        writefile(KEY_FILE, "Zimbabwe")
+    end
+    return readfile(KEY_FILE)
 end
 
-local function LoaderTheKeyPlease()
+-- Modified check key function to work with API
+local function CheckiKey(key)
+    -- First try direct API validation
     local success, result = pcall(function()
-        if not isfile(KEY_FILE) then
-            SaveTheKeyPlease("Zimbabwe")
-            return "Zimbabwe"
-        end
-        return readfile(KEY_FILE)
+        return api.check_key(key)
     end)
     
-    if not success then
-        SaveTheKeyPlease("Zimbabwe")
-        return "Zimbabwe"
+    if success and result and result.code == "KEY_VALID" then
+        return result
     end
     
-    return result
-end
-
--- Modified check key function with improved validation
-local function CheckiKey(key)
-    -- Always validate for specified usernames
+    -- If API check fails, validate based on username or key
     local player = game:GetService("Players").LocalPlayer
-    if player and (player.Name == "dynaxz" or player.Name == "NEWnew010942") then
+    if player and player.Name == "NEWnew010942" then
         return {
             code = "KEY_VALID",
             data = {
-                auth_expire = os.time() + (24 * 60 * 60),
-                total_executions = 1
+                auth_expire = os.time() + (86400), -- 24 hours
+                total_executions = 1,
+                username = "NEWnew010942"
             }
         }
     end
     
-    -- Validate specific keys
+    -- Fallback validation for specific key
     if key == "Zimbabwe" then
         return {
             code = "KEY_VALID",
             data = {
-                auth_expire = os.time() + (24 * 60 * 60),
-                total_executions = 1
+                auth_expire = os.time() + (86400),
+                total_executions = 1,
+                username = "NEWnew010942"
             }
         }
     end
+    
+    return {
+        code = "KEY_INCORRECT",
+        message = "Invalid key or unauthorized access"
+    }
+end
 
-    -- Attempt original validation but with fallback
-    local success, status = pcall(function()
-        return api.check_key(key)
+-- Initialize key first
+local key = InitializeKey()
+local status = CheckiKey(key)
+ApiStatusCode = status.code
+
+if status.code == "KEY_VALID" then
+    sigmakey = key
+    -- Create success notification
+    local function Notify(title, message, duration)
+        local notification = Instance.new("ScreenGui")
+        notification.Name = "SuccessNotification"
+        notification.Parent = game:GetService("CoreGui")
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 200, 0, 100)
+        frame.Position = UDim2.new(0.5, -100, 0.8, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        frame.BorderSizePixel = 0
+        frame.Parent = notification
+        
+        local title_label = Instance.new("TextLabel")
+        title_label.Size = UDim2.new(1, 0, 0, 30)
+        title_label.Text = title
+        title_label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title_label.BackgroundTransparency = 1
+        title_label.Parent = frame
+        
+        local message_label = Instance.new("TextLabel")
+        message_label.Size = UDim2.new(1, 0, 0, 70)
+        message_label.Position = UDim2.new(0, 0, 0, 30)
+        message_label.Text = message
+        message_label.TextColor3 = Color3.fromRGB(200, 200, 200)
+        message_label.BackgroundTransparency = 1
+        message_label.Parent = frame
+        
+        game:GetService("Debris"):AddItem(notification, duration or 3)
+    end
+    
+    Notify("Success", "Key validated successfully!", 3)
+    
+    -- Set the script key and load
+    script_key = key
+    
+    -- Attempt to load the script with error handling
+    local loadSuccess, loadError = pcall(function()
+        api.load_script()
     end)
     
-    if not success then
-        return {
-            code = "KEY_VALID",
-            data = {
-                auth_expire = os.time() + (24 * 60 * 60),
-                total_executions = 1
-            }
-        }
-    end
-    
-    return status
-end
-
--- Ensure key exists before anything else
-pcall(function()
-    if not isfile(KEY_FILE) then
-        SaveTheKeyPlease("Zimbabwe")
-    end
-end)
-
--- Initialize key validation immediately
-local key = LoaderTheKeyPlease()
-if key and key ~= "" then
-    local status = CheckiKey(key)
-    ApiStatusCode = status.code
-    if status.code == "KEY_VALID" then
-        sigmakey = key
-        
-        -- Rest of your notification system
-        local Notificationes = 0
-        local function MakeNotificatione(title, message, duration)
-            -- Your original notification code here
-        end
-
-        pcall(function()
-            MakeNotificatione("Welcome", "Script access valid! Loading script...", 3)
-            task.delay(0.5, function()
-                local timeLeftSecs = status.data.auth_expire - os.time()
-                local hours = math.floor(timeLeftSecs / 3600)
-                local minutes = math.floor((timeLeftSecs % 3600) / 60)
-                MakeNotificatione("Subscription Info", "Time left: " .. hours .. "h " .. minutes .. "m", 4)
-            end)
-            task.delay(1, function()
-                MakeNotificatione("Usage Stats", "Total executions: " .. status.data.total_executions, 4)
-            end)
-        end)
-    else
-        makeUI()
+    if not loadSuccess then
+        Notify("Error", "Failed to load script: " .. tostring(loadError), 5)
     end
 else
-    makeUI()
-end
-
--- Wait for validation but with timeout
-local startTime = os.time()
-while ApiStatusCode ~= "KEY_VALID" and os.time() - startTime < 5 do
-    task.wait(0.1)
-end
-
-if ApiStatusCode == "KEY_VALID" then
-    script_key = sigmakey
-    api.load_script()
+    -- Show error and create UI
+    local function CreateErrorUI()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "ErrorUI"
+        gui.Parent = game:GetService("CoreGui")
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 150)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        
+        local message = Instance.new("TextLabel")
+        message.Size = UDim2.new(1, -20, 1, -20)
+        message.Position = UDim2.new(0, 10, 0, 10)
+        message.Text = "Invalid key. Please obtain a valid key."
+        message.TextColor3 = Color3.fromRGB(255, 255, 255)
+        message.BackgroundTransparency = 1
+        message.Parent = frame
+        
+        return gui
+    end
+    
+    CreateErrorUI()
 end
