@@ -1,7 +1,7 @@
 local c = identifyexecutor and identifyexecutor() or "Unknown"
 
-if c == "Xeno" or c == "Solara" then
-    game.Players.LocalPlayer:Kick("your executor isnt supported, use a better executor.")
+if c == "Xeno" or c == "Solara" or c == "JJSploit" then
+    game.Players.LocalPlayer:Kick("your shitty executor isnt fucking supported, use a better executor.")
     return
 end
 
